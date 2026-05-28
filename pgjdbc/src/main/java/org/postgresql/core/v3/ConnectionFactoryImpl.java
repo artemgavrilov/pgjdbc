@@ -347,7 +347,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
             GT.tr("Unable to load OAuth token provider {0}", providerClassName),
             PSQLState.INVALID_PARAMETER_VALUE, ex);
       }
-      
+
       token = provider.getToken();
       if (token == null || token.isEmpty()) {
         throw new PSQLException(
@@ -1065,11 +1065,11 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
                   oauthAuthenticator.handleAuthenticationSASL(oauthToken);
                   if (oauthToken != null) {
                     /*
-                     * If we actually sent token, then we don't expect any more authentication requests, 
+                     * If we actually sent token, then we don't expect any more authentication requests,
                      * so we can mark authentication as finished. If token was empty, then server will send
                      * discovery information and we will finish the authentication later.
                      */
-                     pgStream.setFinishedAuthenticationRequests();
+                    pgStream.setFinishedAuthenticationRequests();
                   }
 
                 } else if (saslMechanisms.stream().anyMatch(element -> ScramMechanism.supportedMechanisms().contains(element))
@@ -1115,7 +1115,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
                 if (oauthAuthenticator != null) {
                   oauthAuthenticator.handleAuthenticationSASLContinue(msgLen - 4 - 4);
                   // At this point we can mark authentication as finished, as we don't expect any more requests from the server
-                  pgStream.setFinishedAuthenticationRequests(); 
+                  pgStream.setFinishedAuthenticationRequests();
                 } else if (scramAuthenticator != null) {
                   scramAuthenticator.handleAuthenticationSASLContinue(msgLen - 4 - 4);
                 } else {
@@ -1179,7 +1179,7 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
         }
       }
     }
-}
+  }
 
   /*
    * Reads the null-terminated mechanism list from an AuthenticationSASL message body.

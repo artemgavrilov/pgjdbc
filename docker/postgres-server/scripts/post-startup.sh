@@ -112,6 +112,15 @@ main () {
         create_replica one 5433
         create_replica two 5434
     fi
+
+    if is_option_enabled "${OAUTH:-no}" && is_pg_version_at_least "18"; then
+        # Role used by OAuth integration tests.  The preferred_username claim in
+        # the Keycloak JWT equals "testoauth" which pg_oidc_validator maps to
+        # this role via the oauthmap ident mapping.
+        psql_super "${POSTGRES_DB}" "CREATE ROLE testoauth WITH LOGIN;"
+        psql_super "${POSTGRES_DB}" "GRANT CONNECT ON DATABASE test TO testoauth;"
+        psql_super "test" "GRANT USAGE ON SCHEMA public TO testoauth;"
+    fi
 }
 
 main "$@"

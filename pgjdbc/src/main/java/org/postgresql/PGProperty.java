@@ -160,6 +160,17 @@ public enum PGProperty {
       new String[] {"disable", "prefer", "require"}),
 
   /**
+   * Order in which the driver searches classloaders when loading a class named by a connection
+   * property. See {@link org.postgresql.util.ClassLoaderStrategy} for the meaning of each value.
+   */
+  CLASS_LOADER_STRATEGY(
+      "classLoaderStrategy",
+      "driver-first",
+      "Order in which the driver searches classloaders when loading a class named by a connection property.",
+      false,
+      new String[]{"driver", "driver-first", "context-first"}),
+
+  /**
    * Determine whether SAVEPOINTS used in AUTOSAVE will be released per query or not
    */
   CLEANUP_SAVEPOINTS(
@@ -773,11 +784,19 @@ public enum PGProperty {
   /**
    * File containing the SSL Key. Default will be the file {@code postgresql.pk8} in {@code $HOME/.postgresql} (*nix)
    * or {@code %APPDATA%\postgresql} (windows).
+   *
+   * <p>The key format follows the file extension (case-insensitive):
+   * {@code .p12}/{@code .pfx} for PKCS-12,
+   * {@code .pem} for PEM,
+   * {@code .der} for DER/PKCS-8.
+   * For any other extension (including {@code .key}), the driver inspects the first
+   * 64 KiB of the file: it reads the key as PEM if that prefix contains the
+   * {@code -----BEGIN PRIVATE KEY-----} header, otherwise as DER/PKCS-8.</p>
    */
   SSL_KEY(
       "sslkey",
       null,
-      "The location of the client's PKCS#8 SSL key"),
+      "The location of the client's SSL key"),
 
   /**
    * Parameter governing the use of SSL. The allowed values are {@code disable}, {@code allow},

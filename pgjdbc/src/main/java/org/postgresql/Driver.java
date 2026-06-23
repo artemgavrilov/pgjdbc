@@ -37,7 +37,9 @@ import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
 import java.util.ArrayList;
 import java.util.Enumeration;
+import java.util.Objects;
 import java.util.Properties;
+import java.util.ResourceBundle;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
@@ -130,7 +132,8 @@ public class Driver implements java.sql.Driver {
 
   private static <T> T doPrivileged(PrivilegedExceptionAction<T> action) throws Throwable {
     try {
-      Class<?> accessControllerClass = Class.forName("java.security.AccessController");
+      Class<?> accessControllerClass = Class.forName("java.security.AccessController", true,
+          Driver.class.getClassLoader());
       Method doPrivileged = accessControllerClass.getMethod("doPrivileged",
           PrivilegedExceptionAction.class);
       //noinspection unchecked
@@ -445,6 +448,7 @@ public class Driver implements java.sql.Driver {
    */
   @Override
   public boolean acceptsURL(String url) {
+    Objects.requireNonNull(url, "url");
     return parseURL(url, null) != null;
   }
 
@@ -795,6 +799,11 @@ public class Driver implements java.sql.Driver {
     }
     DriverManager.deregisterDriver(registeredDriver);
     registeredDriver = null;
+    // Release the cached localized message bundle. A class-based translation bundle (for example
+    // messages_tr) otherwise keeps this classloader alive through the JVM-wide ResourceBundle cache,
+    // which defeats the very purpose of deregistering the driver. The no-arg clearCache() clears the
+    // entries for this caller's classloader, which is the one GT used to load the bundle.
+    ResourceBundle.clearCache();
   }
 
   /**

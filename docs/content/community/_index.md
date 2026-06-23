@@ -8,9 +8,14 @@ draft: false
 
 Please do not contact the maintainers directly unless you have a specific need to contact just them.  Please use the [Github discussions](https://github.com/pgjdbc/pgjdbc/discussions) if at all possible.
 
+Primary committers:
+
 * Dave Cramer ([@davecramer](https://github.com/davecramer))
 * Vladimir Sitnikov ([@vlsi](https://github.com/vlsi))
 * Sehrope Sarkuni ([@sehrope](https://github.com/sehrope))
+
+Occasional committers:
+
 * Brett Okken ([@bokken](https://github.com/bokken))
 * Jorge Solórzano ([@jorsol](https://github.com/jorsol))
 
@@ -40,5 +45,5 @@ Most recent contributors can be found [here](https://github.com/pgjdbc/pgjdbc/gr
 | ru - Russian | Serguei Mokhov |
 | sr - Serbian | Bojan Skaljac  |
 | tr - Turkish | Devrim Gunduz, Nicolai Tufar |
-| zh_CN - Simplified Chinese | Weiping, Kuo ChaoYi |
+| zh_CN - Simplified Chinese | Weiping, Kuo ChaoYi, Feng Zhihao |
 | zh_TW - Traditional Chinese  | Zhenbang Wei, Kuo ChaoYi  |

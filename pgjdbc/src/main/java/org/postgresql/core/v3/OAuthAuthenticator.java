@@ -129,7 +129,7 @@ public final class OAuthAuthenticator {
     msg.put(SOH);
     msg.put("auth=".getBytes(StandardCharsets.UTF_8));
 
-    if (tokenLen > 0) {
+    if (token != null && tokenLen > 0) {
       if (!TOKEN_REGEX.matcher(CharBuffer.wrap(token)).matches()) {
         throw new PSQLException(
             GT.tr("Invalid OAuth bearer token format. See RFC 6750 §2.1 for details."),

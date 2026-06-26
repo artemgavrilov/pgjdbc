@@ -54,6 +54,17 @@ hba_file = '/home/certdir/pg_hba.conf'
 log_line_prefix = 'REPLICA<${name}>: %m [%p]'
 EOF
 
+    if is_option_enabled "${OAUTH:-no}" && is_pg_version_at_least "18"; then
+        # The replica shares the primary's pg_hba.conf, which contains an oauth
+        # rule. These settings are passed to the primary as command-line options
+        # (see entrypoint.sh), so the replica must set them explicitly.
+        cat <<EOF >>"${replica_data_dir}/postgresql.conf"
+oauth_validator_libraries = 'pg_oidc_validator'
+pg_oidc_validator.authn_field = 'preferred_username'
+ident_file = '/tmp/pg_ident.conf'
+EOF
+    fi
+
     log "Starting replica ${name} that will listen on port ${port}"
     pg_ctl start -D "${replica_data_dir}"
 }

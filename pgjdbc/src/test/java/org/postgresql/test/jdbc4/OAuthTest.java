@@ -101,6 +101,7 @@ public class OAuthTest {
   void staticToken() throws Exception {
     Properties props = new Properties();
     PGProperty.USER.set(props, USERNAME);
+    PGProperty.OAUTH_ALLOW_UNENCRYPTED.set(props, "true");
     PGProperty.OAUTH_TOKEN.set(props, fetchToken(KEYCLOAK_TOKEN_URL, KEYCLOAK_SCOPE));
 
     try (Connection c = TestUtil.openDB(props)) {
@@ -115,6 +116,7 @@ public class OAuthTest {
   void tokenProvider() throws SQLException {
     Properties props = new Properties();
     PGProperty.USER.set(props, USERNAME);
+    PGProperty.OAUTH_ALLOW_UNENCRYPTED.set(props, "true");
     PGProperty.OAUTH_TOKEN_PROVIDER_CLASS_NAME.set(props, TokenProvider.class.getName());
 
     try (Connection c = TestUtil.openDB(props)) {
@@ -129,6 +131,7 @@ public class OAuthTest {
   void invalidToken() throws Exception {
     Properties props = new Properties();
     PGProperty.USER.set(props, USERNAME);
+    PGProperty.OAUTH_ALLOW_UNENCRYPTED.set(props, "true");
     PGProperty.OAUTH_TOKEN.set(props, "invalid-bearer-token");
 
     PSQLException ex = assertThrows(
@@ -144,6 +147,7 @@ public class OAuthTest {
   void requireAuthAllowsOAuth() throws Exception {
     Properties props = new Properties();
     PGProperty.USER.set(props, USERNAME);
+    PGProperty.OAUTH_ALLOW_UNENCRYPTED.set(props, "true");
     PGProperty.OAUTH_TOKEN.set(props, fetchToken(KEYCLOAK_TOKEN_URL, KEYCLOAK_SCOPE));
     PGProperty.REQUIRE_AUTH.set(props, "oauth-bearer");
 
@@ -170,6 +174,9 @@ public class OAuthTest {
 
   @Test
   void channelBindingIncompatibleWithOAuth() throws Exception {
+    // channelBinding requires a TLS connection, so this scenario only applies when SSL is enabled.
+    TestUtil.assumeSslTestsEnabled();
+
     Properties props = new Properties();
     PGProperty.USER.set(props, USERNAME);
     PGProperty.SSL_MODE.set(props, "require");

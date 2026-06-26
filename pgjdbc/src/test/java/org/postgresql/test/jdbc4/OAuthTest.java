@@ -188,7 +188,7 @@ public class OAuthTest {
 
   public static class TokenProvider implements OAuthTokenProvider {
     @Override
-    public String getToken() throws PSQLException {
+    public char @Nullable [] getToken() throws PSQLException {
       String token = null;
       try {
         token = fetchToken(KEYCLOAK_TOKEN_URL, KEYCLOAK_SCOPE);
@@ -202,7 +202,7 @@ public class OAuthTest {
             "oauthToken system property not set",
             PSQLState.INVALID_PARAMETER_VALUE);
       }
-      return token;
+      return token.toCharArray();
     }
   }
 

@@ -330,10 +330,10 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
     return false;
   }
 
-  private static @Nullable String resolveOAuthToken(Properties info) throws PSQLException {
-    String token = PGProperty.OAUTH_TOKEN.getOrDefault(info);
-    if (token != null && !token.isEmpty()) {
-      return token;
+  private static char @Nullable [] resolveOAuthToken(Properties info) throws PSQLException {
+    String tokenText = PGProperty.OAUTH_TOKEN.getOrDefault(info);
+    if (tokenText != null && !tokenText.isEmpty()) {
+      return tokenText.toCharArray();
     }
 
     String providerClassName = PGProperty.OAUTH_TOKEN_PROVIDER_CLASS_NAME.getOrDefault(info);
@@ -348,8 +348,8 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
             PSQLState.INVALID_PARAMETER_VALUE, ex);
       }
 
-      token = provider.getToken();
-      if (token == null || token.isEmpty()) {
+      char [] token = provider.getToken();
+      if (token == null || token.length == 0) {
         throw new PSQLException(
             GT.tr("OAuth token provider returned no token"),
             PSQLState.CONNECTION_REJECTED);
@@ -1061,8 +1061,18 @@ public class ConnectionFactoryImpl extends ConnectionFactory {
                   boolean allowUnencrypted =
                       PGProperty.OAUTH_ALLOW_UNENCRYPTED.getBoolean(info);
                   oauthAuthenticator = new OAuthAuthenticator(pgStream, allowUnencrypted);
-                  String oauthToken = resolveOAuthToken(info);
-                  oauthAuthenticator.handleAuthenticationSASL(oauthToken);
+                  char [] oauthToken = resolveOAuthToken(info);
+                  try {
+                    if (oauthToken != null) {
+                      oauthAuthenticator.handleAuthenticationSASL(oauthToken);
+                    }
+                  } finally {
+                    if (oauthToken != null) {
+                      /* Cleanup token */
+                      Arrays.fill(oauthToken, (char) 0);
+                    }
+                  }
+
                   if (oauthToken != null) {
                     /*
                      * If we actually sent token, then we don't expect any more authentication requests,

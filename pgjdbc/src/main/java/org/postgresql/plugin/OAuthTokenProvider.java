@@ -15,9 +15,15 @@ public interface OAuthTokenProvider {
   /**
    * Returns a token for OAuth authentication.
    *
+   * <p>For security reasons, the driver will wipe the contents of the array returned
+   * by this method after it has been used for authentication.</p>
+   *
+   * <p><b>Implementers must provide a new array each time this method is invoked as
+   * the previous contents will have been wiped.</b></p>
+   *
    * @return the token; must not be null
    * @throws PSQLException if the token cannot be obtained
    */
-  String getToken() throws PSQLException;
+  char [] getToken() throws PSQLException;
 
 }

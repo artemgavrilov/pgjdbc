@@ -5,6 +5,7 @@
 
 package org.postgresql.core.v3;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -15,21 +16,26 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.nio.charset.StandardCharsets;
+
 class BuildTokenMessageTest {
   @Test
   void validToken() throws PSQLException {
-    String message = OAuthAuthenticator.buildTokenMessage("abc123-._~+/=");
-    assertEquals("n,,\u0001auth=Bearer abc123-._~+/=\u0001\u0001", message);
+    byte[] message = OAuthAuthenticator.buildTokenMessage("abc123-._~+/=".toCharArray());
+    assertEquals("n,,\u0001auth=Bearer abc123-._~+/=\u0001\u0001",
+        new String(message, StandardCharsets.UTF_8));
   }
 
   @Test
   void nullToken() throws PSQLException {
-    assertEquals("n,,\u0001auth=\u0001\u0001", OAuthAuthenticator.buildTokenMessage(null));
+    assertArrayEquals("n,,\u0001auth=\u0001\u0001".getBytes(StandardCharsets.UTF_8),
+        OAuthAuthenticator.buildTokenMessage(null));
   }
 
   @Test
   void emptyToken() throws PSQLException {
-    assertEquals("n,,\u0001auth=\u0001\u0001", OAuthAuthenticator.buildTokenMessage(""));
+    assertArrayEquals("n,,\u0001auth=\u0001\u0001".getBytes(StandardCharsets.UTF_8),
+        OAuthAuthenticator.buildTokenMessage("".toCharArray()));
   }
 
   @ParameterizedTest
@@ -45,7 +51,7 @@ class BuildTokenMessageTest {
   })
   void invalidToken(String token) {
     PSQLException ex = assertThrows(PSQLException.class,
-        () -> OAuthAuthenticator.buildTokenMessage(token));
+        () -> OAuthAuthenticator.buildTokenMessage(token.toCharArray()));
     assertEquals(PSQLState.CONNECTION_REJECTED.getState(), ex.getSQLState());
   }
 }

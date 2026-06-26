@@ -14,7 +14,10 @@ import org.postgresql.util.PSQLState;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
@@ -28,8 +31,8 @@ public final class OAuthAuthenticator {
   private static final Logger LOGGER = Logger.getLogger(OAuthAuthenticator.class.getName());
   static final String SASL_MECHANISM = "OAUTHBEARER";
 
-  /** SOH character (0x01) used as field separator in RFC 7628 SASL messages. */
-  private static final char SOH = '\u0001';
+  /** SOH byte (0x01) used as field separator in RFC 7628 SASL messages. */
+  private static final byte SOH = 0x01;
 
   /**
    * OAuth bearer token characters per the grammar of RFC 6750 §2.1.
@@ -67,7 +70,7 @@ public final class OAuthAuthenticator {
   /**
    * Sends SASLInitialResponse with the bearer token.
    */
-  void handleAuthenticationSASL(@Nullable String token) throws IOException, PSQLException {
+  void handleAuthenticationSASL(char @Nullable [] token) throws IOException, PSQLException {
     LOGGER.log(Level.FINEST, " FE=> SASLInitialResponse(OAUTHBEARER, auth=Bearer <token>)");
     sendSaslInitialResponse(buildTokenMessage(token));
   }
@@ -95,32 +98,51 @@ public final class OAuthAuthenticator {
     pgStream.flush();
   }
 
-  private void sendSaslInitialResponse(String clientMessage) throws IOException {
+  private void sendSaslInitialResponse(byte[] clientMessage) throws IOException {
     byte[] mechanismBytes = SASL_MECHANISM.getBytes(StandardCharsets.UTF_8);
-    byte[] clientMessageBytes = clientMessage.getBytes(StandardCharsets.UTF_8);
-    int bodyLength = mechanismBytes.length + 1 + Integer.BYTES + clientMessageBytes.length;
+    int bodyLength = mechanismBytes.length + 1 + Integer.BYTES + clientMessage.length;
     pgStream.sendChar(PgMessageType.SASL_INITIAL_RESPONSE);
     pgStream.sendInteger4(Integer.BYTES + bodyLength);
     pgStream.send(mechanismBytes);
     pgStream.sendChar(0);
-    pgStream.sendInteger4(clientMessageBytes.length);
-    pgStream.send(clientMessageBytes);
+    pgStream.sendInteger4(clientMessage.length);
+    pgStream.send(clientMessage);
+
+    /* Cleanup client message as it contains token. */
+    Arrays.fill(clientMessage, (byte) 0);
+
     pgStream.flush();
   }
 
   /**
    * Builds the RFC 7628 SASL client message.
    */
-  static String buildTokenMessage(@Nullable String token) throws PSQLException {
-    String auth = "";
-    if (token != null && !token.isEmpty()) {
-      if (!TOKEN_REGEX.matcher(token).matches()) {
+  static byte[] buildTokenMessage(char @Nullable [] token) throws PSQLException {
+    int tokenLen = token != null ? token.length : 0;
+    // "n,,\x01auth=" = 9 bytes;
+    // "Bearer " + token = 7 + tokenLen;
+    // "\x01\x01" = 2 bytes
+    int msgLen = 9 + (tokenLen > 0 ? 7 + tokenLen : 0) + 2;
+
+    ByteBuffer msg = ByteBuffer.allocate(msgLen);
+    msg.put("n,,".getBytes(StandardCharsets.UTF_8));
+    msg.put(SOH);
+    msg.put("auth=".getBytes(StandardCharsets.UTF_8));
+
+    if (tokenLen > 0) {
+      if (!TOKEN_REGEX.matcher(CharBuffer.wrap(token)).matches()) {
         throw new PSQLException(
             GT.tr("Invalid OAuth bearer token format. See RFC 6750 §2.1 for details."),
             PSQLState.CONNECTION_REJECTED);
       }
-      auth = "Bearer " + token;
+
+      msg.put("Bearer ".getBytes(StandardCharsets.UTF_8));
+      for (char c : token) {
+        msg.put((byte) c);
+      }
     }
-    return "n,," + SOH + "auth=" + auth + SOH + SOH;
+    msg.put(SOH).put(SOH);
+
+    return msg.array();
   }
 }

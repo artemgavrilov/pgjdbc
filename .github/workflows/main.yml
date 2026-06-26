@@ -117,53 +117,6 @@ jobs:
           name: pgjdbc-heapdump-source-distribution
           path: pgjdbc/build/distributions/postgresql-1.0-jdbc-src/target/surefire-reports/*.hprof
 
-  oauth-test:
-    name: 'OAuth tests'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-        with:
-          fetch-depth: 50
-      - name: Start PostgreSQL 18 + Keycloak
-        working-directory: docker/postgres-server
-        env:
-          OAUTH: 'yes'
-          PGV: '18'
-        run: |
-          docker compose --profile oauth up -d --wait
-      - name: 'Set up JDK 21'
-        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
-        with:
-          distribution: zulu
-          java-version: 21
-      - uses: burrunan/gradle-cache-action@4b67497abd37a511d6c1dc6299bdd84ff39f7bf5 # v3.0.2
-        name: Run OAuth tests
-        env:
-          S3_BUILD_CACHE_ACCESS_KEY_ID: ${{ secrets.S3_BUILD_CACHE_ACCESS_KEY_ID }}
-          S3_BUILD_CACHE_SECRET_KEY: ${{ secrets.S3_BUILD_CACHE_SECRET_KEY }}
-          _JAVA_OPTIONS: '-Denable_oauth_tests=true'
-        with:
-          read-only: false
-          job-id: oauth-pg18-jdk21
-          arguments: --scan --no-parallel --no-daemon jandex :postgresql:test --tests org.postgresql.test.jdbc4.OAuthTest
-      - name: Collect logs on failure
-        if: ${{ failure() }}
-        working-directory: docker/postgres-server
-        shell: bash
-        run: |
-          docker compose --profile oauth logs --no-color > "$RUNNER_TEMP/pg-oauth-logs.txt" 2>&1
-      - name: Upload logs on failure
-        if: ${{ failure() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: pg-oauth-pg18-logs
-          path: ${{ runner.temp }}/pg-oauth-logs.txt
-      - name: Cleanup Docker
-        if: ${{ always() }}
-        working-directory: docker/postgres-server
-        run: |
-          docker compose --profile oauth down
-
   matrix_prep:
     name: Matrix Preparation
     runs-on: ubuntu-latest
@@ -195,6 +148,9 @@ jobs:
       ACTIONS_STEP_DEBUG: true
       ACTIONS_RUNNER_DEBUG: true
       TZ: ${{ matrix.tz }}
+      # Enable the docker-compose 'oauth' profile (starts Keycloak) for oauth=yes rows.
+      # Applied at job level so the start, log-collection, and cleanup steps all agree.
+      COMPOSE_PROFILES: ${{ matrix.oauth == 'yes' && 'oauth' || '' }}
       # Empty on fork pull requests (secrets are withheld), set on the upstream repo
       # and on any fork that defined its own token. Used in the codecov steps' `if`,
       # since secrets cannot be referenced from `if` conditions directly.
@@ -212,6 +168,7 @@ jobs:
         XA: ${{ matrix.xa }}
         SSL: ${{ matrix.ssl }}
         SCRAM: ${{ matrix.scram }}
+        OAUTH: ${{ matrix.oauth }}
         CREATE_REPLICAS: ${{ matrix.replication }}
         PG_IMAGE: ${{ matrix.pg_version == 'HEAD' && 'pgjdbc/postgres-devel:ci-head' || '' }}
         PG_PULL_POLICY: ${{ matrix.pg_version == 'HEAD' && 'build' || 'missing' }}

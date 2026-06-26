@@ -186,6 +186,15 @@ matrix.addAxis({
 });
 
 matrix.addAxis({
+  name: 'oauth',
+  title: x => (x.value === 'yes' ? '' : 'no_') + 'oauth',
+  values: [
+    {value: 'yes', weight: 2},
+    {value: 'no', weight: 10},
+  ]
+});
+
+matrix.addAxis({
   name: 'xa',
   title: x => (x.value === 'yes' ? '' : 'no_') + 'xa',
   values: [
@@ -279,7 +288,7 @@ function lessThan(minVersion) {
 matrix.setNamePattern([
     'java_version', 'java_distribution', 'pg_version', 'query_mode', 'scram', 'ssl', 'hash', 'os',
     'server_tz', 'tz', 'locale',
-    'check_anorm_sbt', 'gss', 'replication', 'slow_tests',
+    'check_anorm_sbt', 'gss', 'oauth', 'replication', 'slow_tests',
     'adaptive_fetch', 'rewrite_batch_inserts', 'query_timeout',
     'autosave', 'cleanupSavepoints', 'cpu_count', 'assertions'
 ]);
@@ -300,6 +309,11 @@ matrix.imply({java_distribution: {value: 'oracle'}}, {java_version: v => v === e
 // TODO: Semeru does not ship Java 21 builds yet
 matrix.exclude({java_distribution: {value: 'semeru'}, java_version: '21'})
 matrix.imply({gss: {value: 'yes'}}, {os: {value: 'ubuntu-latest'}})
+// The oauth auth method requires PostgreSQL 18, and the test relies on the
+// Keycloak container plus the pg_oidc_validator deb, both of which only exist
+// for PG 18 on the Docker-based (Linux) setup.
+matrix.imply({oauth: {value: 'yes'}}, {pg_version: '18'})
+matrix.imply({oauth: {value: 'yes'}}, {os: {value: 'ubuntu-latest'}})
 // ikalnytskyi/action-setup-postgres supports PostgreSQL 14+ only
 matrix.exclude({os: {value: ['windows-latest', 'macos-latest']}, pg_version: lessThan('14')});
 // HEAD is built from pgdg-snapshot inside Docker, which only runs on Linux.
@@ -326,6 +340,9 @@ matrix.generateRow({java_version: matrix.axisByName.java_version.values[0]});
 matrix.generateRow({java_version: "17"});
 // Ensure there will be at least one job with the latest Java (excluding EA)
 matrix.generateRow({java_version: matrix.axisByName.java_version.values.slice(-2)[0]});
+// Ensure OAuth is exercised in at least one job (it used to be a standalone CI job).
+// The implies above pin this row to PG 18 on ubuntu.
+matrix.generateRow({oauth: {value: 'yes'}});
 // Ensure we test all query_mode values
 matrix.ensureAllAxisValuesCovered('query_mode');
 matrix.ensureAllAxisValuesCovered('gss');
@@ -387,6 +404,7 @@ include.forEach(v => {
   v.slow_tests = v.slow_tests.value;
   v.xa = v.xa.value;
   v.gss = v.gss.value;
+  v.oauth = v.oauth.value;
   v.ssl = v.ssl.value;
   v.scram = v.scram.value;
   v.check_anorm_sbt = v.check_anorm_sbt.value;
@@ -471,6 +489,9 @@ include.forEach(v => {
   }
   if (v.gss === 'no') {
       testJvmArgs.push('-DskipGssEncryption=true');
+  }
+  if (v.oauth === 'yes') {
+      jvmArgs.push('-Denable_oauth_tests=true');
   }
   if (v.cpu_count.value === '1') {
       // Constrains ForkJoinPool common pool to a single worker, exposing FJP submit/compensation

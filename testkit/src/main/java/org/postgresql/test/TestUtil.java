@@ -359,7 +359,41 @@ public class TestUtil {
    */
   public static Connection openDB(Properties props) throws SQLException {
     Properties propsWithDefaults = mergeDefaultProperties(props);
-    return DriverManager.getConnection(getURL(propsWithDefaults), propsWithDefaults);
+    // Build the URL before any OAuth redirection so getURL() still matches PgConnection.getURL():
+    // the token provider is passed as a connection property, not appended to the URL.
+    String url = getURL(propsWithDefaults);
+
+
+    if (System.getProperty("authMode", "default").equals("oauth")) {
+      propsWithDefaults = configureOAuthAuthentication(propsWithDefaults);
+    }
+    return DriverManager.getConnection(url, propsWithDefaults);
+  }
+
+  /** 
+   * Helper - configures OAuth authentication for the default test user.
+   */
+  private static Properties configureOAuthAuthentication(Properties props) {
+    // The caller already has configured OAuth authentication, so leave it as is.
+    if (PGProperty.OAUTH_TOKEN.getOrDefault(props) != null
+        || PGProperty.OAUTH_TOKEN_PROVIDER_CLASS_NAME.getOrDefault(props) != null) {
+      return props;
+    }
+    // Only redirect connections that use the default test user, everything else keeps its own auth.
+    String defaultUser = getUser();
+    String user = PGProperty.USER.getOrDefault(props);
+    if (defaultUser == null || !defaultUser.equals(user)) {
+      return props;
+    }
+    Properties resultProps = new Properties(props);
+    PGProperty.OAUTH_TOKEN_PROVIDER_CLASS_NAME.set(resultProps,
+        "org.postgresql.test.OAuthTestTokenProvider");
+    // Most tests connect without TLS, so let OAuth work without TLS. 
+    // Some tests use their own props and are excluded with TLS.
+    if (PGProperty.OAUTH_ALLOW_UNENCRYPTED.getOrDefault(resultProps) == null) {
+      PGProperty.OAUTH_ALLOW_UNENCRYPTED.set(resultProps, "true");
+    }
+    return resultProps;
   }
 
   /**

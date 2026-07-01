@@ -363,14 +363,13 @@ public class TestUtil {
     // the token provider is passed as a connection property, not appended to the URL.
     String url = getURL(propsWithDefaults);
 
-
     if (System.getProperty("authMode", "default").equals("oauth")) {
       propsWithDefaults = configureOAuthAuthentication(propsWithDefaults);
     }
     return DriverManager.getConnection(url, propsWithDefaults);
   }
 
-  /** 
+  /**
    * Helper - configures OAuth authentication for the default test user.
    */
   private static Properties configureOAuthAuthentication(Properties props) {
@@ -388,9 +387,11 @@ public class TestUtil {
     Properties resultProps = new Properties(props);
     PGProperty.OAUTH_TOKEN_PROVIDER_CLASS_NAME.set(resultProps,
         "org.postgresql.test.OAuthTestTokenProvider");
-    // Most tests connect without TLS, so let OAuth work without TLS. 
+    // Most tests connect without TLS, so let OAuth work without TLS.
     // Some tests use their own props and are excluded with TLS.
-    if (PGProperty.OAUTH_ALLOW_UNENCRYPTED.getOrDefault(resultProps) == null) {
+    // Check the raw property rather than getOrDefault(), whose non-null "false" default
+    // would make the guard always skip and never enable unencrypted OAuth.
+    if (resultProps.getProperty(PGProperty.OAUTH_ALLOW_UNENCRYPTED.getName()) == null) {
       PGProperty.OAUTH_ALLOW_UNENCRYPTED.set(resultProps, "true");
     }
     return resultProps;

@@ -8,13 +8,13 @@ package org.postgresql.test;
 import org.postgresql.plugin.OAuthTokenProvider;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
+import org.postgresql.util.URLCoder;
 
 import java.io.BufferedReader;
 import java.io.DataOutputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URI;
-import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.stream.Collectors;
 
@@ -49,10 +49,10 @@ public class OAuthTestTokenProvider implements OAuthTokenProvider {
 
   private static String fetchToken(String url, String scope) throws Exception {
     String body = "grant_type=password"
-        + "&client_id=" + URLEncoder.encode(KEYCLOAK_CLIENT_ID, "UTF-8")
-        + "&password=" + URLEncoder.encode(KEYCLOAK_PASSWORD, "UTF-8")
-        + "&username=" + URLEncoder.encode(USERNAME, "UTF-8")
-        + "&scope=" + URLEncoder.encode(scope, "UTF-8");
+        + "&client_id=" + URLCoder.encode(KEYCLOAK_CLIENT_ID)
+        + "&password=" + URLCoder.encode(KEYCLOAK_PASSWORD)
+        + "&username=" + URLCoder.encode(USERNAME)
+        + "&scope=" + URLCoder.encode(scope);
 
     String response = httpPost(url, body);
     String key = "\"access_token\":\"";

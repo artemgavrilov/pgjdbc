@@ -189,15 +189,17 @@ matrix.addAxis({
   ]
 });
 
-// Available options for oauth_frontend:
-//   none  - no OAuth: Keycloak is not started and the OAuth integration tests are skipped
-//   smoke - start required infrastrucutre and run the dedicated OAuthTest
+// Available options for oauth:
+//   no    - no infrastructure is started and the OAuth integration tests are skipped
+//   smoke - start the required infrastructure and run OAuth tests
+//   all   - start the required infrastructure and route all tests through OAuth authentication
 matrix.addAxis({
-  name: 'oauth_frontend',
-  title: x => x.value === 'none' ? '' : 'oauth_' + x.value,
+  name: 'oauth',
+  title: x => x.value === 'no' ? '' : 'oauth_' + x.value,
   values: [
-    {value: 'none', weight: 10},
+    {value: 'no', weight: 10},
     {value: 'smoke', weight: 2},
+    {value: 'all', weight: 1},
   ]
 });
 
@@ -286,7 +288,7 @@ function lessThan(minVersion) {
 matrix.setNamePattern([
     'java_version', 'java_distribution', 'pg_version', 'query_mode', 'scram', 'ssl', 'hash', 'os',
     'server_tz', 'tz', 'locale',
-    'gss', 'oauth_frontend', 'replication', 'slow_tests',
+    'gss', 'oauth', 'replication', 'slow_tests',
     'adaptive_fetch', 'rewrite_batch_inserts', 'query_timeout',
     'autosave', 'cleanupSavepoints', 'cpu_count', 'assertions'
 ]);
@@ -308,10 +310,17 @@ matrix.imply({java_distribution: {value: 'oracle'}}, {java_version: v => v === e
 matrix.exclude({java_distribution: {value: 'semeru'}, java_version: '21'})
 matrix.imply({gss: {value: 'yes'}}, {os: {value: 'ubuntu-latest'}})
 // The oauth auth method requires PostgreSQL 18, and the test relies on the
-// Keycloak container plus the pg_oidc_validator deb, both of which only exist
+// Keycloak container and the pg_oidc_validator, both of which only exist
 // for PG 18 on the Docker-based (Linux) setup.
-matrix.imply({oauth_frontend: {value: 'smoke'}}, {pg_version: '18'})
-matrix.imply({oauth_frontend: {value: 'smoke'}}, {os: {value: 'ubuntu-latest'}})
+matrix.imply({oauth: {value: ['smoke', 'all']}}, {pg_version: '18'})
+matrix.imply({oauth: {value: ['smoke', 'all']}}, {os: {value: 'ubuntu-latest'}})
+// "all" oauth mode replaces the test role's authentication with oauth, so it is incompatible with tests that
+// authenticate the test user a different way or assume TCP host semantics: GSS negotiates its own
+// encryption, replication tests use the privileged role and compare hosts, and SSL tests use
+// channelBinding=require, which is incompatible with OAuth. Keep those on normal auth.
+matrix.exclude({oauth: {value: 'all'}, gss: {value: 'yes'}})
+matrix.exclude({oauth: {value: 'all'}, replication: {value: 'yes'}})
+matrix.exclude({oauth: {value: 'all'}, ssl: {value: 'yes'}})
 // ikalnytskyi/action-setup-postgres supports PostgreSQL 14+ only
 matrix.exclude({os: {value: ['windows-latest', 'macos-latest']}, pg_version: lessThan('14')});
 // HEAD is built from pgdg-snapshot inside Docker, which only runs on Linux.
@@ -349,7 +358,7 @@ const include = matrix.generateRows(Number(process.env.MATRIX_JOBS || 6), {
         slow_tests: {value: 'no'}, gss: {value: 'yes'},
         // Run the OAuth smoke tests on the coverage job so OAuth code earns PR diff coverage.
         // smoke implies pg_version 18, which equals MAX_PG already pinned here, so no conflict.
-        oauth_frontend: {value: 'smoke'},
+        oauth: {value: 'smoke'},
       },
       tag: row => { row.collectCoverage = true; },
     },
@@ -369,8 +378,10 @@ const include = matrix.generateRows(Number(process.env.MATRIX_JOBS || 6), {
     {java_version: "17"},
     // Ensure there will be at least one job with the latest Java (excluding EA)
     {java_version: LATEST_JAVA},
-    // Ensure the OAuth smoke path is exercised in at least one job.
-    {oauth_frontend: {value: 'smoke'}},
+    // Ensure the OAuth smoke tests are exercised in at least one job.
+    {oauth: {value: 'smoke'}},
+    // Ensure the OAuth "all" mode (whole test suite authenticates via OAuth) is exercised in at least one job.
+    {oauth: {value: 'all'}},
     // Ensure at least one job with autosave=always
     {autosave: {value: 'always'}},
     // Ensure we test all values of the axes below
@@ -438,7 +449,7 @@ include.forEach(v => {
   v.slow_tests = v.slow_tests.value;
   v.xa = v.xa.value;
   v.gss = v.gss.value;
-  v.oauth_frontend = v.oauth_frontend.value;
+  v.oauth = v.oauth.value;
   v.ssl = v.ssl.value;
   v.scram = v.scram.value;
   v.query_mode = v.query_mode.value;
@@ -531,9 +542,13 @@ include.forEach(v => {
       testJvmArgs.push('-ea');
   }
   delete v.assertions;
-  if (v.oauth_frontend !== 'none') {
-      // smoke (and, later, all) start Keycloak and run the OAuth integration tests
+  if (v.oauth !== 'no') {
+      // start needed infrastructure and run OAuth integration tests
       jvmArgs.push('-Denable_oauth_tests=true');
+  }
+  if (v.oauth === 'all') {
+      // Route every connection through OAuth
+      jvmArgs.push('-DauthMode=oauth');
   }
   v.extraJvmArgs = jvmArgs.join(' ');
   v.testExtraJvmArgs = testJvmArgs.join(' ::: ');
